@@ -1,12 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600&family=JetBrains+Mono:wght@300;400&display=swap');
-
 :root {
   /* The interface cyan. `--accent` is re-declared per phase and per panel;
      this one stays put and is what anything neutral pins itself to. */
   --interface: #00e5ff;
   --accent: var(--interface);
   --bg: #01060c;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
   color-scheme: dark;
 }
 

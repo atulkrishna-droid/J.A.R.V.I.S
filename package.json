@@ -9,12 +9,17 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node scripts/start.mjs",
+    "start": "./start-local-jarvis.sh",
+    "start:web": "node scripts/start.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "bridge": "node bridge/server.mjs",
+    "bridge:ollama": "node bridge/ollama.mjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "npm run build && tauri build",
+    "test:local": "node --test test/*.test.mjs",
     "bridge:writes": "JARVIS_ALLOW_WRITES=1 node bridge/server.mjs",
     "setup": "node scripts/setup.mjs"
   },

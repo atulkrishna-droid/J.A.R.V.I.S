@@ -23,6 +23,12 @@ console.log('');
 console.log('JARVIS preflight — checking your machine (nothing is changed)');
 console.log('------------------------------------------------------------');
 
+let backend = 'ollama';
+try {
+  const envText = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
+  backend = envText.match(/^\s*VITE_BACKEND\s*=\s*["']?([^"'\s#]+)/m)?.[1] ?? backend;
+} catch { /* .env.local is optional. */ }
+
 // --- Node version --------------------------------------------------------
 try {
   const major = Number(process.versions.node.split('.')[0]);
@@ -46,11 +52,15 @@ try {
 } catch {
   // ignore — handled below
 }
-if (!claudeFound) {
+if (!claudeFound && backend === 'bridge') {
   line(warn, 'Claude CLI not found on your PATH.');
   line(info, 'Install it: npm install -g @anthropic-ai/claude-code');
   line(info, '  (or the platform installer at https://docs.claude.com/en/docs/claude-code)');
   line(info, 'Then run `claude` once and complete login. The bridge uses that login — no API key needed.');
+}
+
+if (backend === 'ollama') {
+  line(info, 'Claude Agent SDK integration is preserved but is not used by the local Ollama provider.');
 }
 
 // --- ~/.claude.json and MCP servers --------------------------------------
@@ -96,21 +106,53 @@ function findElevenLabsKey() {
 }
 
 const elSource = findElevenLabsKey();
-if (elSource) {
+if (elSource && backend !== 'ollama') {
   line(tick, `Premium voice available — ElevenLabs key found via ${elSource}.`);
-} else {
+} else if (backend !== 'ollama') {
   line(info, 'No ElevenLabs key found — JARVIS will use browser speech (that is completely fine).');
   line(info, '  Optional: add ELEVENLABS_API_KEY for a better voice and Scribe transcription. The free tier is enough for a demo.');
 }
 
+// --- Local Ollama ---------------------------------------------------------
+if (backend === 'ollama') {
+  try {
+    const host = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+    const response = await fetch(`${host.replace(/\/$/, '')}/api/tags`, { signal: AbortSignal.timeout(2000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const names = (data.models ?? []).map((model) => model.name);
+    const qwen = names.find((name) => /qwen.*14b|14b.*qwen/i.test(name)) ?? names.find((name) => /qwen/i.test(name));
+    if (qwen) line(tick, `Ollama is available. Local Qwen model detected: ${qwen}.`);
+    else line(warn, `Ollama is available but no Qwen model was found (${names.join(', ') || 'no models installed'}). No model will be downloaded automatically.`);
+  } catch (error) {
+    line(warn, `Ollama is not responding at ${process.env.OLLAMA_HOST || 'http://127.0.0.1:11434'} (${error.message}).`);
+    line(info, 'Start Ollama before opening a chat. The app will not download a model automatically.');
+  }
+  const rust = spawnSync('rustc', ['--version'], { encoding: 'utf8' });
+  if (rust.status === 0) line(tick, `Rust toolchain found: ${rust.stdout.trim()}.`);
+  else line(warn, 'Rust/Cargo is missing. Tauri desktop builds need the stable Rust toolchain and Pop!_OS WebKitGTK build libraries.');
+  if (backend === 'ollama') {
+    const cli = spawnSync('tauri', ['--version'], { encoding: 'utf8' });
+    if (cli.status === 0) line(tick, `Tauri CLI found: ${(cli.stdout || cli.stderr).trim()}.`);
+    else line(warn, 'Tauri CLI is not installed. Install @tauri-apps/cli before building the native desktop packages.');
+  }
+}
+
 // --- How to run ----------------------------------------------------------
 console.log('');
-console.log('To run JARVIS, open two terminals:');
-console.log('  1)  npm run bridge      # the brain (Claude Code, headless)');
-console.log('  2)  npm run dev         # the face (open http://localhost:5173 in Chrome)');
-console.log('');
-console.log('Then click INITIALISE and say "Hey Jarvis".');
-console.log('To let JARVIS take real actions (phone, browser, sending), run `npm run bridge:writes` instead of `npm run bridge`.');
+if (backend === 'ollama') {
+  console.log('To run the local desktop app:');
+  console.log('  ./start-local-jarvis.sh');
+  console.log('');
+  console.log('For development, use `npm run desktop:dev`; production builds use `npm run desktop:build`.');
+} else {
+  console.log('To run the existing browser build, open two terminals:');
+  console.log('  1)  npm run bridge      # Claude Code, headless');
+  console.log('  2)  npm run dev         # frontend dev server');
+  console.log('');
+  console.log('Then open the printed URL in Chrome or Edge and click INITIALISE.');
+  console.log('To enable effectful actions, read decideTool() and run `npm run bridge:writes`.');
+}
 console.log('');
 
 process.exit(0);

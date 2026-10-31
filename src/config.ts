@@ -49,20 +49,20 @@ function flag(name: string, raw: unknown, fallback: boolean): boolean {
 /**
  * Which brain to use.
  *
- *   'bridge' — run `npm run bridge` alongside the app. Authenticates off your
- *              existing Claude Code login (no API key), and every MCP server in
- *              your Claude Code config is available to JARVIS, including local
- *              ones like higgsfield, elevenlabs, android and playwright.
+ *   'ollama' — the packaged desktop bridge streams from the local Ollama API.
+ *              No cloud provider or account is used.
+ *
+ *   'bridge' — the older optional Claude Agent SDK bridge and its MCP tools.
  *
  *   'direct' — the browser calls the Claude API itself. Nothing to run and it
  *              deploys as a static site, but it needs VITE_ANTHROPIC_API_KEY in
  *              the bundle and only reaches remote HTTP MCP servers.
  */
-export const BACKEND: 'bridge' | 'direct' = choice(
+export const BACKEND: 'bridge' | 'ollama' | 'direct' = choice(
   'VITE_BACKEND',
   import.meta.env.VITE_BACKEND,
-  ['bridge', 'direct'] as const,
-  'bridge',
+  ['bridge', 'ollama', 'direct'] as const,
+  'ollama',
 )
 
 /**

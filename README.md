@@ -1,315 +1,137 @@
 # J.A.R.V.I.S.
 
-A browser voice assistant with an Iron Man holographic interface. Say
-**"Hey Jarvis"**, he wakes, listens, and does real things through your tools —
-searches the web, generates images, drives your phone, reads your mail. The face
-is a web page (React + Vite + Three.js + custom GLSL). The brain is Claude Code,
-run headless as a library.
+J.A.R.V.I.S. is a local-first AI assistant project with a holographic React interface, a local Ollama bridge, and an in-progress Tauri 2 desktop shell. A separate legacy browser experience and Claude Agent SDK bridge remain in the repository.
 
-**The only subscription you need is Claude Code.** No API keys, no OpenAI
-account, no cloud bill — the brain runs on your existing Claude Code login, and
-the heavy work (the model itself) runs on Anthropic's servers, so even a low-end
-laptop only has to draw the interface. **ElevenLabs is an optional add-on** that
-gives JARVIS a much better voice and sharper hearing; without it he speaks and
-listens through the browser's own speech, and everything still works.
+The source tree contains both the established browser interface and newer desktop/Ollama work. The Tauri package configuration targets AppImage and Debian packages, but a successful native package build has not yet been verified on this checkout.
 
----
+## Features in the current source
 
-## Requirements
+- React 19 and TypeScript interface built with Vite.
+- Three.js, React Three Fiber, and custom GLSL effects in the legacy holographic interface.
+- Desktop shell with a central animated reactor, local model controls, chat history in WebView local storage, file attachment, screenshot capture, and read-only project excerpts.
+- Local Node.js bridge for Ollama model discovery, heuristic role routing, streamed chat, model lifecycle operations, system metrics, and optional local speech tools.
+- Optional local Whisper.cpp transcription and Piper speech when their programs and model files are configured.
+- Preserved Claude Agent SDK bridge with MCP integration and a default-deny gate for effectful tools.
 
-**In one line:** a Claude Code subscription, plus two free things every computer
-can have — Node.js and Chrome. That's the whole list.
+See [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) for the distinction between implemented, partial, and planned work.
 
-- **Claude Code, installed and logged in** — this is the only account you need.
-  Install it with the official method — `npm install -g @anthropic-ai/claude-code`,
-  or the platform installer at <https://docs.claude.com/en/docs/claude-code> —
-  then run `claude` once and complete login. The bridge reuses that login. **No
-  API key**, and usage is billed to your existing Claude account.
-- **Node.js 20 or newer** — free, one installer from <https://nodejs.org>. This
-  is a Node web app, so it is the one unavoidable tool.
-- **Google Chrome or Microsoft Edge**, in a **real browser window** — not an
-  embedded preview pane. Preview panes (including the one inside editors and
-  Claude Code) block microphone access, so the page loads and looks right but
-  never hears you. JARVIS also needs WebGL, which these browsers provide.
-- **Optional: an ElevenLabs API key** — a good add-on, not a requirement. It
-  gives a better voice and sharper transcription; the free tier is plenty for a
-  demo. Without it, everything runs on the browser's own speech.
+## Screenshots
 
-Run `npm run setup` after cloning and it checks all of this for you, in plain
-language.
+Screenshots are not included in this repository yet. Add reviewed images under `docs/assets/` and link them here when available.
 
----
+<!-- Screenshot placeholder: docs/assets/jarvis-desktop.png -->
 
-## Quick start
+## Architecture
 
-First, install, then start it:
+```mermaid
+flowchart LR
+  UI[React / Vite UI] -->|WebSocket chat| B[Node Ollama bridge]
+  UI -->|HTTP status, models, voice| B
+  B -->|loopback HTTP| O[Ollama]
+  O --> Q[Installed local model]
+  T[Tauri 2 shell] --> UI
+  T -->|starts and stops| B
+  L[Legacy browser UI] -->|WebSocket / HTTP| C[Claude Agent SDK bridge]
+  C --> MCP[Configured MCP servers]
+```
+
+The desktop build defaults to the local Ollama provider. The older browser path uses the Claude bridge when selected; the optional direct Anthropic mode sends its API key to the browser bundle and should only be used for a local demo. Details are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/AI_INTEGRATION.md](docs/AI_INTEGRATION.md).
+
+## Technology
+
+React, TypeScript, Vite, Three.js, React Three Fiber, GLSL, Zustand, Node.js, WebSocket (`ws`), Ollama, and a Tauri 2 Rust shell. The complete dependency inventory is in [docs/TECH_STACK.md](docs/TECH_STACK.md).
+
+## Prerequisites
+
+- Node.js 20 or newer and npm.
+- Ollama, running locally, with a chat-capable model already installed. The bridge does not download models on startup.
+- For the native desktop build: Rust/Cargo, the Tauri CLI, and the Linux WebKitGTK build dependencies listed in [INSTALL-DESKTOP.md](INSTALL-DESKTOP.md).
+- Optional local voice: `whisper-cli`, `ffmpeg`, and a local Whisper model for transcription; `piper` and a local voice model for speech output.
+
+## Install and run
 
 ```bash
+git clone <repository-url>
+cd jarvis
 npm install
-npm start          # runs the brain and the face together
+npm run setup
 ```
 
-Then open the URL it prints (http://localhost:5173) in **Chrome**, click **INITIALISE**, and say **“Hey Jarvis”**.
-
-Prefer two terminals? Run them separately instead:
+For the native desktop window, install the documented Linux and Rust prerequisites, then the Tauri CLI if it is not already installed. Start with:
 
 ```bash
-npm install
+npm start
 ```
 
-Terminal 1 — the brain:
+The launcher checks for Ollama and an installed Qwen model, then opens a built AppImage if present or a Tauri development window. The Tauri shell starts the Ollama bridge and stops the child process when the app exits.
+
+For web development of the local Ollama interface, use two terminals:
 
 ```bash
-npm run bridge
-```
+# Terminal 1
+npm run bridge:ollama
 
-Terminal 2 — the face:
-
-```bash
+# Terminal 2
 npm run dev
 ```
 
-Then open the app in a **real Chrome or Edge window**:
+Then open the Vite URL shown in the terminal. For the preserved Claude browser experience, use the Claude bridge and its matching frontend configuration; see [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md).
+
+## Ollama model configuration
+
+Check your installed tags with `ollama list`. The bridge prefers a Qwen 14B model, then another Qwen model, then the first installed model. To pin a tag, export `OLLAMA_MODEL` in the environment that starts the bridge, for example:
 
 ```bash
-open http://localhost:5173
+export OLLAMA_MODEL=qwen3:14b
+npm run bridge:ollama
 ```
 
-Click **INITIALISE**, allow the microphone when asked, and say **"Hey Jarvis"**.
-
-> It has to be a real browser window. Embedded preview panes block the
-> microphone, so JARVIS will look perfectly alive and simply never respond.
-
----
-
-## How it works
-
-JARVIS is two processes. The browser is the face and the voice; the bridge is
-the brain and the hands.
-
-```
-  ┌─ browser (the face) ───────────────┐        ┌─ bridge (the brain) ─────────────┐
-  │  "Hey Jarvis" wake word            │        │  Node · bridge/server.mjs        │
-  │  local VAD  →  speech to text      │   ws   │  Claude Agent SDK                │
-  │  reactor UI (Three.js + GLSL)      │◄─────► │   = Claude Code, headless        │
-  │  text to speech                    │  8787  │  spawns your MCP servers         │
-  │  heads-up display                  │        │  permission gate (decideTool)    │
-  └────────────────────────────────────┘        └──────────────────────────────────┘
-```
-
-Everything you see and hear happens in the browser. The bridge is a single Node
-process (`bridge/server.mjs`) that runs the **Claude Agent SDK**
-(`@anthropic-ai/claude-agent-sdk`) — this spawns the real `claude` CLI as a child
-process, so **the brain literally is Claude Code, headless.** They talk over a
-WebSocket (plus a few HTTP endpoints) on `ws://localhost:8787`.
-
-**Why a bridge at all?** A browser tab cannot spawn the local stdio MCP servers —
-`higgsfield`, `elevenlabs`, `android`, `playwright`, `exa`, `serper`, and the
-rest. The bridge can. And because it is the Agent SDK, it authenticates off your
-existing Claude Code login: no API key, billed to that same Claude account.
-
-**The model.** `claude-opus-5` at effort `medium` by default. Override with the
-`JARVIS_MODEL` and `JARVIS_EFFORT` environment variables. On startup the bridge
-prints its choice, e.g. `[jarvis] model claude-opus-5 · effort medium`.
-
-### The voice pipeline
-
-The loop is designed so that nothing silently dies and barge-in feels natural.
-
-- **Detection is local.** An energy-based voice-activity detector
-  (`src/lib/vad.ts`) decides when you are speaking. It is instant, cannot quietly
-  fail, and is what makes **barge-in** work — speak while JARVIS is talking and he
-  stops.
-- **Transcription has two tiers, chosen automatically at boot.** The browser asks
-  the bridge `/health` and picks the best available:
-  - **ElevenLabs key present** → ElevenLabs Scribe, via the bridge `/stt` endpoint.
-  - **Nothing configured** → the browser's own `SpeechRecognition` (Chrome/Edge),
-    guarded by a heartbeat so it recovers when Chrome throttles it.
-- **Speaking** uses the **ElevenLabs voice when a key is present**, and the
-  browser's `speechSynthesis` otherwise. If a cloud call fails it falls back to
-  the browser voice, and if the OS voice itself is broken it latches over to the
-  cloud voice.
-
-So it works with no keys and auto-upgrades when a key appears — there is no flag
-to set. Capability detection lives in `src/lib/capabilities.ts`, which probes the
-bridge's `GET /health` (returning `{ ok, tts, stt }`, both tracking the
-ElevenLabs key) once at boot and picks the engines.
-
----
-
-## What JARVIS can do
-
-Beyond answering, JARVIS reaches every MCP server in your Claude Code
-configuration, and can drive his own interface.
-
-### Your tools
-
-Every server in your `~/.claude.json` is handed to the SDK explicitly. Depending
-on what you have installed, that is roughly:
-
-- **Web & search** — `exa`, `serper`, `serpapi`
-- **Images & video** — `higgsfield`, `openrouter-image`, `palmier-pro`
-- **Voice** — `elevenlabs`
-- **Your phone** — `android`
-- **The browser** — `playwright`
-
-A few things you can say:
-
-- *"What's happening in AI this week?"*
-- *"Generate an image of the Mark VII suit."*
-- *"Take a screenshot of my phone."*
-- *"Open my GitHub notifications."*
-
-> **Note on account connectors.** Servers you added through your **claude.ai
-> account** are not stored on disk, so the bridge cannot see them — it works from
-> the servers in `~/.claude.json` (about 14), not the claude.ai ones.
-
-### JARVIS controls the interface
-
-He drives the UI through MCP tools the bridge exposes:
-
-- `ui_theme` — accent, background, per-phase colours
-- `ui_reactor` — colour, scale, intensity, spin, and style (`ring` | `sphere` | `wire`), visibility
-- `ui_orbit` — put images in orbit around the reactor
-- `ui_chrome` — show or hide rails, transcript, badges
-- `ui_effect` — `glitch` | `pulse` | `scan` | `shake` | `flash`
-- `ui_screen` — clear
-- `ui_reset` — back to defaults
-
-So *"make it red, hide the systems list, put that render in orbit"* is a spoken
-command.
-
-### The heads-up display
-
-JARVIS authors panels with a `display` tool against a fixed `.hud-*` design
-system. The browser sanitises the markup (DOMPurify, a class allowlist and a
-strict CSP) before rendering. Rich media works — images, `<video>`, and
-YouTube/Vimeo embeds. Remote images and video are fetched **server-side** through
-the bridge (`/img` and `/media`, both SSRF-guarded), so hotlink-blocked news
-thumbnails still appear and the page never beacons your IP to a host the model
-chose.
-
----
-
-## Controls
-
-| Key / phrase | Does |
-|---|---|
-| **"Hey Jarvis"** | Wake him |
-| **Space** | Talk without the wake word |
-| Just speak | Interrupt him mid-sentence (barge-in) |
-| **V** | Cycle the browser voice |
-| **Escape** | Stand down |
-| **D** | Live diagnostics panel |
-| **T** | One-line audio self-test |
-
----
-
-## The boot sequence
-
-Power-up plays a four-beat Iron Man start-up (`src/ui/Boot.tsx`): an
-"INITIATING SYSTEM" status bar with a segmented progress bar and boot log; then
-concentric reticle rings resolving into "J.A.R.V.I.S"; then a suit schematic;
-then the triangular arc reactor lighting up — with a start-up sound under it
-(`public/audio/boot-music.mp3`).
-
----
+The model router uses prompt keywords and installed model names. It is a simple heuristic, not a trained classifier. The current chat request sets `num_ctx` to 4096 in code. Model capabilities and loaded state depend on the local Ollama installation. See [docs/AI_INTEGRATION.md](docs/AI_INTEGRATION.md).
 
 ## Configuration
 
-Everything is optional in bridge mode. Frontend settings live in `.env.local`
-(copy `.env.example`); bridge settings are environment variables.
+Copy `.env.example` as a reference when configuring the frontend. Vite reads `VITE_*` variables from `.env.local`; keep that file private and untracked. The Node bridge reads its `OLLAMA_*`, `WHISPER_MODEL`, `PIPER_MODEL`, and `JARVIS_*` variables from its process environment; it does not load `.env.local` itself.
 
-### Bridge
+Never commit credentials. In particular, `VITE_ANTHROPIC_API_KEY` is bundled into client-side code in `direct` mode. Use the local Ollama provider for local inference. Full variable descriptions are in [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) and [docs/SECURITY.md](docs/SECURITY.md).
 
-| Variable | Default | Effect |
-|---|---|---|
-| `JARVIS_BRIDGE_PORT` | `8787` | Port for the WebSocket + HTTP endpoints |
-| `JARVIS_MODEL` | `claude-opus-5` | Model to run |
-| `JARVIS_EFFORT` | `medium` | Reasoning effort |
-| `JARVIS_ALLOW_WRITES` | off | `1` allows effectful tools (see below) |
-| `JARVIS_ALLOWED_ORIGINS` | local dev | Extra WebSocket origins to accept |
-| `JARVIS_ALLOW_NO_ORIGIN` | off | Accept connections with no `Origin` header |
-| `JARVIS_FILE_ROOTS` | — | Roots the `/file` endpoint may serve from |
-| `JARVIS_VOICE_ID` | — | ElevenLabs voice id |
-| `ELEVENLABS_API_KEY` | — | Optional; enables the ElevenLabs voice + Scribe |
-
-### Frontend (`.env.local`)
-
-| Variable | Effect |
-|---|---|
-| `VITE_BACKEND` | `bridge` (default) or `direct` |
-| `VITE_BRIDGE_URL` | Where to reach the bridge |
-| `VITE_TTS_ENGINE` | `system` or `kokoro` |
-| `VITE_KOKORO_VOICE` | Voice for the Kokoro engine |
-| `VITE_USE_ELEVENLABS` | Force the ElevenLabs voice on |
-| `VITE_ANTHROPIC_API_KEY` | Direct mode only |
-
-### Adding an ElevenLabs key
-
-You do not have to touch a flag. Either:
-
-- Set `ELEVENLABS_API_KEY` on the bridge before starting it, **or**
-- Add the key to your `elevenlabs` MCP server's env in `~/.claude.json` — the
-  bridge reads it from there too.
-
-Either way, `/health` starts reporting the capability, the browser picks it up on
-the next boot, and both the voice and transcription upgrade automatically.
-
----
-
-## Enabling actions
-
-The tool gate starts **read-only**. Search, generation and lookups run freely;
-anything effectful — send, tap, delete, install, pay — is denied. Voice is a poor
-interface for a confirmation dialog, so the decision is made ahead of time in
-`decideTool()` in `bridge/server.mjs`, not at the moment of use. The bridge sets
-`settingSources: []`, which makes its own gate the only authority — filesystem
-settings and any global `bypassPermissions` cannot override it.
-
-To allow effectful tools (phone, browser driving, sending), run the bridge this
-way instead:
+## Build, tests, and checks
 
 ```bash
-npm run bridge:writes
+npm run build
+npm run lint
+npm run test:local
+npm run setup
 ```
 
-> Read `decideTool()` before you do. *"Hey Jarvis, clean up my downloads folder"*
-> means something rather different with writes enabled.
-
----
+Build AppImage and `.deb` packages with `npm run desktop:build` after Tauri, Rust, and system build dependencies are installed. The current tests cover Ollama model selection and routing; they do not constitute end-to-end desktop or live Ollama tests.
 
 ## Troubleshooting
 
-**I can't hear him, or he can't hear me.** Press **D** for the diagnostics panel
-— it states plainly whether he is hearing you and whether he is producing sound.
-Press **T** for a one-line audio self-test.
+- **Bridge offline:** make sure `npm run bridge:ollama` is running, or start the Tauri app so it owns the bridge lifecycle. Port `8787` must be available.
+- **No model found:** start Ollama and install a model yourself; the bridge intentionally does not download one automatically.
+- **Vision unavailable:** image requests require an installed compatible vision model such as a supported Qwen-VL or LLaVA tag.
+- **Voice unavailable:** configure local Whisper/Piper tools and model paths. Text chat does not depend on them.
+- **No GPU values:** `nvidia-smi` must work for GPU/VRAM telemetry. CPU and RAM values are collected separately.
+- **Native build fails:** check Rust/Cargo, Tauri CLI, WebKitGTK, and other Linux dependencies in [INSTALL-DESKTOP.md](INSTALL-DESKTOP.md).
 
-**No voice at all.** You must be in **Chrome or Edge**, in a **real browser
-window** (not an embedded preview), and you must have **allowed the microphone**.
+## Security notes
 
-**Bridge not reachable.** Check that `npm run bridge` is still running in its
-terminal, and that nothing else is holding port `8787`.
+- The Ollama bridge binds to `127.0.0.1:8787`; keep it on loopback. Its model management endpoints can load, unload, download, and delete models.
+- The Ollama chat path has no arbitrary shell execution tool. File and project inputs are explicitly selected by the user.
+- The legacy Claude bridge can access MCP tools from Claude configuration. Effectful tools are denied by default; enabling `JARVIS_ALLOW_WRITES` changes that trust boundary.
+- The optional direct Anthropic backend exposes its `VITE_ANTHROPIC_API_KEY` to the client. Do not use it with a shared or public deployment.
+- The Tauri config currently sets `security.csp` to `null`; the browser `index.html` CSP does not by itself prove the packaged WebView has an equivalent policy.
 
----
+See [docs/SECURITY.md](docs/SECURITY.md) before exposing services or enabling actions.
 
-## Security
+## Roadmap
 
-All of this lives in `bridge/server.mjs`:
+The roadmap separates what exists from what remains partial or planned: [docs/ROADMAP.md](docs/ROADMAP.md).
 
-- The WebSocket accepts only local dev origins (add more with
-  `JARVIS_ALLOWED_ORIGINS`).
-- `/file`, `/img` and `/media` validate the scheme, confine to allowed roots,
-  resolve the real path, and refuse private and loopback addresses (SSRF guard).
-- The tool gate (`decideTool`) is default-deny for effectful MCP tools.
-- A strict CSP in `index.html`; model-authored panel HTML is sanitised.
+## Contributing
 
----
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) before making changes. Preserve existing work, run the relevant checks, and report any check that cannot run.
 
-## Credits & licence
+## License
 
-MIT.
-
-The boot sound and any tracks in `public/audio/` ship with the project for the
-demo. If you go on to monetise something built on this, clearing the rights to
-that audio is your responsibility.
+The repository already contains an MIT `LICENSE`; this preparation retains it. Audio credits and the separate CC BY 4.0 notices are in [public/audio/CREDITS.md](public/audio/CREDITS.md).

@@ -35,6 +35,10 @@ type Frame = {
   seconds?: number
   when?: string
   servers?: Array<string | { name?: string }>
+  model?: string
+  role?: string
+  fallback?: boolean
+  attachments?: string[]
 }
 
 /** Every question gets an id so its answer can be told from anyone else's. */
@@ -316,7 +320,11 @@ let pending: { finish: (fallback?: string) => void } | null = null
 export async function ask(
   prompt: string,
   handlers: AskHandlers,
-): Promise<{ text: string; tools: string[] }> {
+  model?: string,
+  role?: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+  attachments: string[] = [],
+): Promise<{ text: string; tools: string[]; model?: string; role?: string; fallback?: boolean }> {
   /**
    * A new question supersedes the one in flight.
    *
@@ -381,12 +389,12 @@ export async function ask(
       ws.removeEventListener('error', onError)
     }
 
-    const finish = (fallback = '') => {
+    const finish = (fallback = '', metadata: Pick<Frame, 'model' | 'role' | 'fallback'> = {}) => {
       if (done) return
       cleanup()
       // Prefer the streamed text; fall back to the final result if this build
       // didn't emit deltas.
-      resolve({ text: (text || fallback).trim(), tools })
+      resolve({ text: (text || fallback).trim(), tools, ...metadata })
     }
 
     const fail = (err: Error) => {
@@ -441,7 +449,7 @@ export async function ask(
             break
 
           case 'done':
-            finish(msg.text ?? '')
+            finish(msg.text ?? '', { model: msg.model, role: msg.role, fallback: msg.fallback })
             break
 
           case 'error':
@@ -467,7 +475,12 @@ export async function ask(
     arm()
 
     try {
-      ws.send(JSON.stringify({ type: 'ask', text: prompt, id }))
+      ws.send(JSON.stringify({
+        type: 'ask', text: prompt, id,
+        ...(model ? { model } : {}), ...(role ? { role } : {}),
+        ...(history.length ? { history: history.slice(-24) } : {}),
+        ...(attachments.length ? { attachments } : {}),
+      }))
     } catch (err) {
       // The socket can go into CLOSING between connect() resolving and here.
       fail(err instanceof Error ? err : new Error(String(err)))

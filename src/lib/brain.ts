@@ -20,7 +20,9 @@ export type { ConnectionState } from './bridge'
  *            and can only use remote HTTP MCP servers.
  */
 
-export const usingBridge = BACKEND === 'bridge'
+/** Both local bridges share the WebSocket protocol. `bridge` is the optional
+ * Claude Agent SDK provider; `ollama` is the default, fully local provider. */
+export const usingBridge = BACKEND !== 'direct'
 
 /** Conversation state lives in the bridge session, so history is only threaded
  *  through on the direct path. */
@@ -28,9 +30,17 @@ export async function ask(
   prompt: string,
   history: Msg[],
   handlers: AskHandlers,
-): Promise<{ text: string; tools: string[] }> {
+  model?: string,
+  role?: string,
+  attachments: string[] = [],
+): Promise<{ text: string; tools: string[]; model?: string; role?: string; fallback?: boolean }> {
   return usingBridge
-    ? bridge.ask(prompt, handlers)
+    ? bridge.ask(prompt, handlers, model, role, history
+        .filter((message) => message.role === 'user' || message.role === 'assistant')
+        .map((message) => ({
+          role: message.role as 'user' | 'assistant',
+          content: typeof message.content === 'string' ? message.content : '',
+      })), attachments)
     : direct.ask([...history, { role: 'user', content: prompt }], handlers)
 }
 

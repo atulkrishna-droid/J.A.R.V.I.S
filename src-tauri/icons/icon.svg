@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="bg"><stop stop-color="#082844"/><stop offset="1" stop-color="#030a12"/></radialGradient>
+    <radialGradient id="core"><stop stop-color="#2bcfff" stop-opacity=".8"/><stop offset=".5" stop-color="#078aff" stop-opacity=".24"/><stop offset="1" stop-color="#03101c"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <circle cx="128" cy="128" r="121" fill="url(#bg)" stroke="#17699a" stroke-width="3"/>
+  <g fill="none" stroke="#36caff" filter="url(#glow)">
+    <circle cx="128" cy="128" r="80" stroke-width="3"/><circle cx="128" cy="128" r="63" stroke-width="2" opacity=".8"/>
+    <path d="M128 34v38M128 184v38M34 128h38M184 128h38M62 62l27 27m78 78 27 27m0-132-27 27m-78 78-27 27" stroke-width="3"/>
+  </g>
+  <circle cx="128" cy="128" r="48" fill="url(#core)" stroke="#82edff" stroke-width="2"/>
+  <path d="M128 84 165 150 91 150Z" fill="none" stroke="#c9fbff" stroke-width="3" filter="url(#glow)"/>
+  <circle cx="128" cy="128" r="5" fill="#fff"/>
+</svg>
